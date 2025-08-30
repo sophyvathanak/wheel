@@ -220,6 +220,9 @@ def startup():
     ensure_csv_exists()
     db()  # ensure tables
 
+@app.get("/api/health")
+def health():
+    return {"ok": True}
 
 @app.get("/api/gifts")
 def get_gifts():
