@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lucky Wheel — Merchant Scanner</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <style>
+      :root {
+        --card: #121a33;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(80% 80% at 50% 20%, #1b2a57, #0b1020);
+        color: #e5e7eb;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial;
+      }
+      .wrap {
+        width: min(96vw, 960px);
+        padding: 24px;
+        border-radius: 24px;
+        background: var(--card);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: clamp(20px, 2.8vw, 28px);
+      }
+      .sub {
+        opacity: 0.75;
+        margin: 0 0 18px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .panel {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 14px;
+      }
+      label {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      input,
+      button,
+      select {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        color: #e5e7eb;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .full {
+        grid-column: 1/-1;
+      }
+      .btn {
+        cursor: pointer;
+        font-weight: 700;
+        background: linear-gradient(180deg, #fbbf24, #f59e0b);
+        color: #111827;
+        border: 0;
+        box-shadow: 0 6px 0 #b45309;
+      }
+      .btn:active {
+        transform: translateY(1px);
+        box-shadow: 0 5px 0 #b45309;
+      }
+      video {
+        width: 100%;
+        border-radius: 12px;
+        background: #0b1020;
+      }
+      .status {
+        min-height: 1.4em;
+        margin-top: 6px;
+      }
+      .ok {
+        color: #86efac;
+      }
+      .bad {
+        color: #fecaca;
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+      }
+      .code {
+        font-size: 18px;
+      }
+      .muted {
+        opacity: 0.8;
+        font-size: 12px;
+      }
+      .banner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin: 12px 0;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.06);
+      }
+    </style>
+    <script
+      src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Merchant Scanner</h1>
+      <p class="sub">
+        Scan customer QR or type the code. Works offline: scans + queues
+        redeems, syncs when back online.
+      </p>
+
+      <div class="banner">
+        <span id="conn" class="pill"
+          >Status: <b id="connText">checking…</b></span
+        ><button
+          id="installBtn"
+          class="btn"
+          style="margin-left: auto; display: none"
+        >
+          Install App
+        </button>
+      </div>
+
+      <div class="grid">
+        <!-- Scanner / Manual -->
+        <div class="panel">
+          <div class="row full">
+            <label>API Base</label>
+            <input
+              id="apiBase"
+              class="full"
+              placeholder="http://127.0.0.1:8000"
+              value="http://127.0.0.1:8000"
+            />
+          </div>
+          <div class="row full">
+            <label>Merchant API Key</label>
+            <input
+              id="apiKey"
+              class="full"
+              placeholder="demo-merchant-key"
+              value="demo-merchant-key"
+            />
+          </div>
+          <div class="row full">
+            <button id="startBtn" class="btn">Start Camera</button>
+            <button id="stopBtn">Stop</button>
+          </div>
+          <video id="video" playsinline muted></video>
+          <div class="row full">
+            <label>Or type voucher code</label>
+            <input
+              id="codeInput"
+              class="full"
+              placeholder="ABCD1234-XXXXXXXXXXXX"
+            />
+            <button id="validateCode" class="btn full">Validate Code</button>
+          </div>
+          <div class="status mono" id="scanStatus"></div>
+          <canvas id="canvas" style="display: none"></canvas>
+        </div>
+
+        <!-- Result / Redeem -->
+        <div class="panel">
+          <div class="status" id="result"></div>
+          <div id="details" style="display: none">
+            <p>
+              <span class="muted">Voucher ID</span><br /><span
+                class="mono"
+                id="voucherId"
+                >—</span
+              >
+            </p>
+            <p><span class="muted">Prize</span><br /><b id="prize">—</b></p>
+            <p>
+              <span class="muted">Expires</span><br /><span id="exp">—</span>
+            </p>
+            <button id="redeemBtn" class="btn">Redeem</button>
+            <p class="muted">
+              Offline? Redeem will be queued and auto-sent when you reconnect.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const savedBase = localStorage.getItem("merchant_api_base");
+        if (!savedBase) {
+          const input = document.getElementById("apiBase");
+          if (input) input.value = window.location.origin + "/api";
+        }
+      });
+      // --- PWA install + SW registration ---
+      let deferredPrompt = null;
+      const installBtn = document.getElementById("installBtn");
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.style.display = "inline-flex";
+      });
+      installBtn.addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        installBtn.style.display = "none";
+        deferredPrompt = null;
+      });
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js");
+        navigator.serviceWorker.addEventListener("message", (event) => {
+          const { type, payload } = event.data || {};
+          if (type === "redeem-sync-success")
+            setStatus("Queued redeem sent ✅", true);
+          if (type === "redeem-sync-fail")
+            setStatus("Queued redeem failed — will retry", false);
+        });
+      }
+
+      // --- Connection banner ---
+      const connText = document.getElementById("connText");
+      function updateConn() {
+        connText.textContent = navigator.onLine ? "online" : "offline";
+      }
+      window.addEventListener("online", updateConn);
+      window.addEventListener("offline", updateConn);
+      updateConn();
+
+      // --- Scanner page logic ---
+      const $ = (s) => document.querySelector(s);
+      const state = { stream: null, scanning: false, voucherId: null };
+      const video = $("#video");
+      const canvas = $("#canvas");
+      const ctx = canvas.getContext("2d");
+      const apiBase = $("#apiBase");
+      const apiKey = $("#apiKey");
+      const result = $("#result");
+      const details = $("#details");
+      const prizeEl = $("#prize");
+      const expEl = $("#exp");
+      const voucherIdEl = $("#voucherId");
+      const scanStatus = $("#scanStatus");
+
+      // Persist settings
+      const savedBase = localStorage.getItem("merchant_api_base");
+      const savedKey = localStorage.getItem("merchant_api_key");
+      if (savedBase) apiBase.value = savedBase;
+      if (savedKey) apiKey.value = savedKey;
+      apiBase.addEventListener("change", () =>
+        localStorage.setItem("merchant_api_base", apiBase.value)
+      );
+      apiKey.addEventListener("change", () =>
+        localStorage.setItem("merchant_api_key", apiKey.value)
+      );
+
+      // Helpers
+      function setStatus(text, good) {
+        result.textContent = text;
+        result.className = "status " + (good ? "ok" : "bad");
+      }
+      function showDetails(payload) {
+        details.style.display = "block";
+        voucherIdEl.textContent = payload.voucher_id;
+        prizeEl.textContent = payload.prize_name ?? "(unknown)";
+        expEl.textContent = new Date(
+          payload.expires_at * 1000
+        ).toLocaleString();
+        state.voucherId = payload.voucher_id;
+      }
+
+      async function validateByVoucherId(voucherId) {
+        try {
+          const res = await fetch(
+            `${apiBase.value}/merchant/vouchers/validate`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-API-Key": apiKey.value,
+              },
+              body: JSON.stringify({ voucher_id: voucherId }),
+            }
+          );
+          if (!res.ok) {
+            setStatus("Invalid / not found", false);
+            return;
+          }
+          const data = await res.json();
+          if (data.status !== "issued") {
+            setStatus(`Not valid: ${data.status}`, false);
+          } else {
+            setStatus("Valid — ready to redeem", true);
+          }
+          showDetails({
+            voucher_id: data.voucher_id,
+            prize_name: data.prize_name,
+            expires_at: data.expires_at,
+          });
+        } catch (err) {
+          // Offline — can't validate. Still show unverified details from QR only.
+          setStatus(
+            "Offline — cannot validate now. You can queue redeem.",
+            false
+          );
+          showDetails({
+            voucher_id: voucherId,
+            prize_name: "(unknown until online)",
+            expires_at: Math.floor(Date.now() / 1000) + 600,
+          });
+        }
+      }
+
+      async function validateByCode(code) {
+        const res = await fetch(`${apiBase.value}/merchant/vouchers/validate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": apiKey.value,
+          },
+          body: JSON.stringify({ code }),
+        });
+        if (!res.ok) {
+          setStatus("Invalid code", false);
+          return;
+        }
+        const data = await res.json();
+        if (data.status !== "issued") {
+          setStatus(`Not valid: ${data.status}`, false);
+        } else {
+          setStatus("Valid — ready to redeem", true);
+        }
+        showDetails({
+          voucher_id: data.voucher_id,
+          prize_name: data.prize_name,
+          expires_at: data.expires_at,
+        });
+      }
+
+      async function redeem() {
+        if (!state.voucherId) return;
+        try {
+          const res = await fetch(`${apiBase.value}/merchant/vouchers/redeem`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": apiKey.value,
+            },
+            body: JSON.stringify({ voucher_id: state.voucherId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 202 && data.status === "queued-offline") {
+            setStatus("Offline — redeem queued ⏳", true);
+            return;
+          }
+          if (!res.ok) {
+            setStatus(`Redeem failed: ${JSON.stringify(data)}`, false);
+            return;
+          }
+          setStatus("Redeemed ✅", true);
+        } catch (err) {
+          setStatus("Offline — redeem queued ⏳", true);
+        }
+      }
+
+      // Scan loop (BarcodeDetector -> jsQR fallback)
+      let detector = null;
+      try {
+        if ("BarcodeDetector" in window) {
+          detector = new BarcodeDetector({ formats: ["qr_code"] });
+        }
+      } catch (e) {}
+
+      async function startCamera() {
+        if (state.scanning) return;
+        state.stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        video.srcObject = state.stream;
+        await video.play();
+        state.scanning = true;
+        scanStatus.textContent = "Scanning…";
+        requestAnimationFrame(tick);
+      }
+
+      function stopCamera() {
+        state.scanning = false;
+        scanStatus.textContent = "";
+        if (state.stream) {
+          state.stream.getTracks().forEach((t) => t.stop());
+          state.stream = null;
+        }
+      }
+
+      async function tick() {
+        if (!state.scanning) return;
+        if (video.readyState >= 2) {
+          const w = video.videoWidth,
+            h = video.videoHeight;
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(video, 0, 0, w, h);
+          let text = null;
+          try {
+            if (detector) {
+              const codes = await detector.detect(canvas);
+              if (codes && codes[0]) text = codes[0].rawValue;
+            } else if (window.jsQR) {
+              const img = ctx.getImageData(0, 0, w, h);
+              const r = jsQR(img.data, w, h);
+              if (r) text = r.data;
+            }
+          } catch (e) {}
+          if (text) {
+            state.scanning = false;
+            stopCamera();
+            scanStatus.textContent = "QR detected";
+            // Expect a URL like https://.../v/qr?v=<vid>&p=<idx>&e=<exp>&s=<sig>
+            try {
+              const u = new URL(text);
+              const vid = u.searchParams.get("v");
+              if (vid) {
+                await validateByVoucherId(vid);
+                return;
+              }
+            } catch (e) {
+              /* not a full URL */
+            }
+            // Fallback: parse query-like string
+            const m = text.match(/(?:[?&]|^)(?:v|voucher_id)=([A-Za-z0-9]+)/);
+            if (m) {
+              await validateByVoucherId(m[1]);
+              return;
+            }
+            setStatus("QR scanned, but not a voucher", false);
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+
+      // Wire UI
+      document
+        .getElementById("startBtn")
+        .addEventListener("click", startCamera);
+      document.getElementById("stopBtn").addEventListener("click", stopCamera);
+      document.getElementById("validateCode").addEventListener("click", () => {
+        const code = document.getElementById("codeInput").value.trim();
+        if (code) validateByCode(code);
+      });
+      document.getElementById("redeemBtn").addEventListener("click", redeem);
+    </script>
+  </body>
+</html>
