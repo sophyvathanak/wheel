@@ -224,13 +224,6 @@
     </div>
 
     <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        const savedBase = localStorage.getItem("merchant_api_base");
-        if (!savedBase) {
-          const input = document.getElementById("apiBase");
-          if (input) input.value = window.location.origin + "/api";
-        }
-      });
       // --- PWA install + SW registration ---
       let deferredPrompt = null;
       const installBtn = document.getElementById("installBtn");
@@ -285,7 +278,11 @@
       // Persist settings
       const savedBase = localStorage.getItem("merchant_api_base");
       const savedKey = localStorage.getItem("merchant_api_key");
-      if (savedBase) apiBase.value = savedBase;
+      if (savedBase) {
+        apiBase.value = savedBase;
+      } else {
+        apiBase.value = window.location.origin + "/api";
+      }
       if (savedKey) apiKey.value = savedKey;
       apiBase.addEventListener("change", () =>
         localStorage.setItem("merchant_api_base", apiBase.value)
